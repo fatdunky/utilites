@@ -42,6 +42,14 @@ def write_temp_file(data, direct=None, delete=True):
     
     return name
 
+def append_write_file(data, filename):
+    output = open(filename, 'at')
+    try:
+        for line in data:
+            output.write(str(line))
+    finally:
+        output.close()
+
 
 def write_gz_file(data, filename):
     output = gzip.open(filename, 'wt')
@@ -60,14 +68,6 @@ def write_file(data, filename):
     finally:
         output.close()
 
-
-def append_write_file(data, filename):
-    output = open(filename, 'at')
-    try:
-        for line in data:
-            output.write(str(line))
-    finally:
-        output.close()
 
 def load_class(class_name):
     return_value = locate(class_name)
@@ -97,8 +97,6 @@ def compress_existing_file(input_file):
     return retval
 
 def clean_up_directory(directories, file_patterns, age_limit, compress_limit):
-    # TODO: catch  raise error, v # invalid expression
-    
     now = time.time()
     remove_age = now - (int(age_limit) * 86400)
     compress_age = now - (int(compress_limit) * 86400)

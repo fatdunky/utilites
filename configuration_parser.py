@@ -31,6 +31,31 @@ class ConfigurationParser(object):
             self.__config_directory = default_directory
             logging.info("Specified configuration directory %s, did not exist. Using default directory: %s",directory,default_directory)
          
+    
+    def read_configs(self, configuration_file_names): 
+        '''
+        Load multiple config files
+        '''
+        config_files = []
+        for file_name in configuration_file_names:
+        
+            included_path = os.path.dirname(file_name)
+            configuration_file_name = os.path.basename(file_name)
+             
+            if (included_path == ""):
+                logging.info("Configuration Directory not specified for %s, using set config directory: %s",file_name, configuration_file_name)
+                included_path = os.path.abspath(self.get_config_directory())
+            else:
+                included_path = os.path.abspath(included_path)
+   
+
+            abs_file_name = os.path.join(included_path, configuration_file_name)
+            config_files.append(abs_file_name)
+            
+        loaded_files = self.__config.read(config_files)
+        logging.debug("Loaded the following extra config files %s.",loaded_files)
+    
+    
     def read_config(self, configuration_file_name): 
         '''
         Check if configuration directory exits
@@ -52,6 +77,7 @@ class ConfigurationParser(object):
             default_file = self.__config_directory + os.path.sep + self.__default_config_file
             self.__config.read(default_file)
             logging.info("Specified configuration file %s, did not exist. Using default file: %s",configuration_file_name,default_file)  
+            
             
     def get_config(self):
         return self.__config

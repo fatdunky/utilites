@@ -5,7 +5,7 @@ Created on 3Dec.,2016
 '''
 import logging, os, time
 
-from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler, RotatingFileHandler
 from MyTimedRotatingFileHandler import MyTimedRotatingFileHandler
 
 class Logger(object):
@@ -22,20 +22,27 @@ class Logger(object):
     DEFAULT_LOG_FILE_SUFFIX='.log'
     DEFAULT_LOG_LEVEL=logging.DEBUG
     
-    DEFAULT_LOG_ROTATE=True
+    DEFAULT_LOG_ROTATE_MODE='size'
     DEFAULT_LOG_ROTATE_WHEN='midnight'
     DEFAULT_LOG_ROTATE_INTERVAL=1
     DEFAULT_LOG_ROTATE_BACKUP_COUNT=30
+    DEFAULT_LOG_ROTATE_BYTES=1000000
         
     _console_logging = False
-    _rotate_log = True
+    _rotate_log_mode = DEFAULT_LOG_ROTATE_MODE
     _log_directory = os.getcwd() + os.path.sep + DEFAULT_LOG_DIR
     _log_file = DEFAULT_LOG_FILE_START + DEFAULT_LOG_FILE_SUFFIX
     _format_string = DEFAULT_LOGGER_FORMAT
     _format_date_string = DEFAULT_LOGGER_DATE_FORMAT
     _log_level = DEFAULT_LOG_LEVEL
     _log_file_date = time.strftime("%Y%m%d")
-
+           
+    _rotate_log_mode = DEFAULT_LOG_ROTATE_MODE
+    _when = DEFAULT_LOG_ROTATE_WHEN
+    _interval = DEFAULT_LOG_ROTATE_INTERVAL
+    _backup_count = DEFAULT_LOG_ROTATE_BACKUP_COUNT
+    _bytes = DEFAULT_LOG_ROTATE_BYTES
+        
     _levelNames = {
     logging.CRITICAL : 'CRITICAL',
     logging.ERROR : 'ERROR',
@@ -198,12 +205,13 @@ class Logger(object):
         return Logger._log_level
     
     @staticmethod
-    def set_rotation_file(boolean_value=DEFAULT_LOG_ROTATE, when=DEFAULT_LOG_ROTATE_WHEN, interval=DEFAULT_LOG_ROTATE_INTERVAL, backup_count=DEFAULT_LOG_ROTATE_BACKUP_COUNT):
+    def set_rotation_file(mode=DEFAULT_LOG_ROTATE_MODE, when=DEFAULT_LOG_ROTATE_WHEN, interval=DEFAULT_LOG_ROTATE_INTERVAL, backup_count=DEFAULT_LOG_ROTATE_BACKUP_COUNT, bytes=DEFAULT_LOG_ROTATE_BYTES):
        
-        Logger._rotate_log = bool(boolean_value)
+        Logger._rotate_log_mode = mode
         Logger._when = when
         Logger._interval = interval
         Logger._backup_count = backup_count
+        Logger._bytes = bytes
         
     @staticmethod        
     def update_handler():
@@ -219,9 +227,10 @@ class Logger(object):
         
         
         else:
-            if Logger._rotate_log:        
-                #handler = TimedRotatingFileHandler(self.getFullPathLogFile(), when='midnight', interval=1, backupCount=0, encoding=None, delay=False, utc=False)
+            if Logger._rotate_log_mode.upper() == "TIME" or Logger._rotate_log_mode.upper() == "TIMED" :        
                 Logger._handler = TimedRotatingFileHandler(Logger.get_full_path_log_file(), when=Logger._when, interval=Logger._interval, backupCount=Logger._backup_count, encoding=None, delay=False, utc=False)
+            elif  Logger._rotate_log_mode.upper() == "SIZE":
+                Logger._handler = RotatingFileHandler(Logger.get_full_path_log_file(),maxBytes=Logger._bytes,backupCount=Logger._backup_count, encoding=None, delay=False)
             else:
                 Logger._handler = logging.FileHandler(Logger.get_full_path_log_file(), encoding=None, delay=False)
                 
@@ -235,6 +244,7 @@ class Logger(object):
         Logger._handler.setFormatter(formatter)
         Logger._handler.setLevel(Logger.get_logging_level())
         logging.getLogger().addHandler(Logger._handler)
+
 
         
         #logging.basicConfig(filename=self.getFullPathLogFile(),format=self.formatString,level=self.logLevel)     
