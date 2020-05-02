@@ -4,14 +4,14 @@ Created on 4 Dec. 2017
 @author: mcrick
 '''
 
-import pexpect, tempfile, sys, logging,os, traceback
+import pexpect, tempfile, sys, logging,os
 from pexpect import pxssh
 
-def ssh_with_password(host, cmd, user, password, util_timeout=120, bg_run=False):
+def ssh_with_password(host, cmd, user, password, timeout=30, bg_run=False):
 
 		ret_val = ""
 		try:
-				s = pxssh.pxssh(timeout=util_timeout,options={"StrictHostKeyChecking": "no", "ServerAliveInterval": "30", "ConnectTimeout":"10"})
+				s = pxssh.pxssh(timeout=120,options={"StrictHostKeyChecking": "no", "ServerAliveInterval": "30", "ConnectTimeout":"10"})
 				s.login(host, user, password)
 				logging.debug("ssh_cmd=%s",cmd)
 				s.sendline(cmd)                 # run a command
@@ -26,32 +26,6 @@ def ssh_with_password(host, cmd, user, password, util_timeout=120, bg_run=False)
 				logging.info(e)
 
 		return ret_val
-
-def ssh_hop_with_password(host1, host2, cmd, user1, user2, password1, password2, util_timeout=120, bg_run=False):
-		ret_val = ""
-		try:
-				s = pxssh.pxssh(timeout=util_timeout,options={"StrictHostKeyChecking": "no", "ServerAliveInterval": "30", "ConnectTimeout":"10"})
-				s.login(host1, username=user1, password=password1)
-				logging.debug("host1=%s",host1)
-				s.login(host2, username=user2, password=password2, spawn_local_ssh=False)
-				logging.debug("host2=%s",host2)
-				logging.debug("ssh_cmd=%s",cmd)
-				s.sendline(cmd)                 # run a command
-				s.prompt()                      # match the prompt
-				ret_val = s.before              # print everything before the prompt.
-				s.sendline('exit') # logout is very slow here?
-				s.logout()
-		except pxssh.ExceptionPxssh as e:
-				logging.info("pxssh failed on login.")
-				logging.info(e)
-		except Exception as e:
-				logging.info("pxssh caught exception.")
-				logging.info(e)
-				exc_type, exc_value, exc_tb = sys.exc_info()
-				logging.info(traceback.format_exception(exc_type, exc_value, exc_tb))
-
-		return ret_val
-
 
 
 def ssh_with_password_old(host, cmd, user, password, timeout=30, bg_run=False):

@@ -190,7 +190,8 @@ class Logger(object):
 
             level = Logger._levelNames[level]
 
-        if isinstance(level, (int, long)):
+
+        if isinstance(level, int):
             logging.getLogger().setLevel(level)
             Logger._log_level = level
             logging.info("Setting log level to %s",Logger._levelNames[level])
