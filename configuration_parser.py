@@ -10,16 +10,16 @@ class ConfigurationParser(object):
     This class reads the configuration file and returns a coinfiguration object
     '''
 
-
+   
     def __init__(self, default_config_dir, default_config_file):
         '''
         Constructor
-        '''
+        ''' 
         self.__config = configparser.ConfigParser()
         self.__default_config_dir = default_config_dir
         self.__default_config_file = default_config_file
-        self.__config_directory = os.path.abspath(os.path.dirname(self.__default_config_dir))
-        self.__config_file = os.path.join(os.path.basename(self.__config_directory), self.__default_config_file)
+        self.__config_directory = os.getcwd() + os.path.sep + self.__default_config_dir
+        self.__config_file = self.__config_directory + os.path.sep + self.__default_config_file
 
 
     def set_config_directory(self, directory):
@@ -27,36 +27,36 @@ class ConfigurationParser(object):
             self.__config_directory = directory
             logging.debug("Setting configuration directory to: %s",directory)
         else:
-            default_directory = os.path.abspath(self.__default_config_dir)
+            default_directory = os.getcwd() + os.path.sep + self.__default_config_dir
             self.__config_directory = default_directory
             logging.info("Specified configuration directory %s, did not exist. Using default directory: %s",directory,default_directory)
-
-
-    def read_configs(self, configuration_file_names):
+         
+    
+    def read_configs(self, configuration_file_names): 
         '''
         Load multiple config files
         '''
         config_files = []
         for file_name in configuration_file_names:
-
+        
             included_path = os.path.dirname(file_name)
             configuration_file_name = os.path.basename(file_name)
-
+             
             if (included_path == ""):
                 logging.info("Configuration Directory not specified for %s, using set config directory: %s",file_name, configuration_file_name)
                 included_path = os.path.abspath(self.get_config_directory())
             else:
                 included_path = os.path.abspath(included_path)
-
+   
 
             abs_file_name = os.path.join(included_path, configuration_file_name)
             config_files.append(abs_file_name)
-
+            
         loaded_files = self.__config.read(config_files)
         logging.debug("Loaded the following extra config files %s.",loaded_files)
-
-
-    def read_config(self, configuration_file_name):
+    
+    
+    def read_config(self, configuration_file_name): 
         '''
         Check if configuration directory exits
         '''
@@ -64,49 +64,46 @@ class ConfigurationParser(object):
         configuration_file_name = os.path.basename(configuration_file_name)
         if included_path != "":
             self.set_config_directory(included_path)
-
+        
         if self.__config_directory is None or self.__config_directory == "":
-            self.set_config_directory(os.path.abspath(self.__default_config_dir))
-            logging.info("Configuration Directory no set, using default directory: %s",os.path.abspath(self.__default_config_dir))
+            default_directory = os.getcwd() + os.path.sep + self.__default_config_dir
+            self.set_config_directory(default_directory)
+            logging.info("Configuration Directory no set, using default directory: %s",default_directory)
 
-        if os.path.isfile(configuration_file_name):
+        if os.path.isfile(configuration_file_name): 
             self.__config.read(configuration_file_name)
-            print("setting config file {}".format(configuration_file_name))
             logging.debug("Setting configuration file to: %s",configuration_file_name)
         else:
-            print("setting default config file {}".format(self.get_abs_default_config_file()))
-            self.__config.read(self.get_abs_default_config_file())
-            logging.info("Specified configuration file %s, did not exist. Using default file: %s",configuration_file_name,self.get_abs_default_config_file())
-
-
-    def get_abs_default_config_file(self):
-        return os.path.join(os.path.abspath(self.__default_config_dir), os.path.basename(self.__default_config_file))
-
+            default_file = self.__config_directory + os.path.sep + self.__default_config_file
+            self.__config.read(default_file)
+            logging.info("Specified configuration file %s, did not exist. Using default file: %s",configuration_file_name,default_file)  
+            
+            
     def get_config(self):
         return self.__config
 
 
     def get_config_file(self):
         return self.__config_file
-
+    
     def get_config_directory(self):
         return self.__config_directory
 
     def set_config_file(self, value):
-        if os.path.isfile(value):
+        if os.path.isdir(value):
             self.__config_file = value
             logging.debug("Setting configuration file to: %s",value)
         else:
-            default_file = self.__default_config_file
+            default_file = self.get_config_directory() + os.path.sep + self.__default_config_file
             self.__config_file = default_file
             logging.info("Specified configuration file %s, did not exist. Using default file: %s",value,default_file)
-
+         
     def del_config_file(self):
         del self.__config_file
-
+    
     def del_config_directory(self):
         del self.__config_directory
-
+    
     def get_default_config_dir(self):
         return self.__default_config_dir
 

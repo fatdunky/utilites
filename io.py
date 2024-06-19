@@ -7,6 +7,13 @@ import gzip, logging, tarfile, os, tempfile, re, time
 from pydoc import locate
 from contextlib import closing, contextmanager
 
+def append_write_file(data, filename):
+    output = open(filename, 'at')
+    try:
+        for line in data:
+            output.write(str(line))
+    finally:
+        output.close()
 
 def read_gz_file(file_name):
     input_file = gzip.open(file_name, 'rt') 
@@ -41,14 +48,6 @@ def write_temp_file(data, direct=None, delete=True):
         output.close()
     
     return name
-
-def append_write_file(data, filename):
-    output = open(filename, 'at')
-    try:
-        for line in data:
-            output.write(str(line))
-    finally:
-        output.close()
 
 
 def write_gz_file(data, filename):
@@ -86,7 +85,7 @@ def compress_existing_file(input_file):
     retval = False
     if (not input_file.endswith('.gz')):
         try:
-            f_in = open(input_file)
+            f_in = open(input_file, 'rb')
             f_out = gzip.open(input_file + '.gz', 'wb')
             f_out.writelines(f_in)
             retval = True

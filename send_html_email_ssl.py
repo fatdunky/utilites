@@ -1,17 +1,36 @@
-#!/usr/bin/python
 # Simple script used to send an HTML file as an HTML formatted email,
 # using Gmail's SMTP service. Used for testing HTML emails.
 # The core message-sending code is taken from the docs:
 # http://docs.python.org/2/library/email-examples.html
 # The code for correctly authenticating against Gmail comes from:
 # http://kutuma.blogspot.co.uk/2007/08/sending-emails-via-gmail-with-python.html
-import smtplib, logging
+import smtplib, logging, os, mimetypes, base64
 import argparse
 from getpass import getpass
 from os.path import basename
+from email.message import EmailMessage
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.audio import MIMEAudio
+from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
+from .proxy_smtp import ProxySMTP
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+import google.auth
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import (
+    Mail, Attachment, FileContent, FileName,
+    FileType, Disposition, ContentId)
 
 
 def parse_args():
@@ -105,8 +124,8 @@ def get_parser():
 
 def print_args(args):
     """Print out the input arguments."""
-    print 'Sending test email to: %s' % args.recipients
-    print 'Sending test email from: %s' % args.sender
+    print('Sending test email to: %s' % args.recipients)
+    print('Sending test email from: %s' % args.sender)
 
 
 def create_message(args):
@@ -149,15 +168,21 @@ def create_message(args):
 
     return msg
 
-
-def send_email(args):
+def send_email(args,use_proxy,proxy_host,proxy_port):
     """ Args: recipients (space delimeted), html_filename, title, plain, debug, files, username, password, port, host
     """
     msg = create_message(args)
 
     try:
         logging.debug("sending email %s:%s",args.host,args.port)
-        smtpserver = smtplib.SMTP_SSL(args.host, int(args.port))
+        logging.debug("args = %s",args)
+        logging.debug("debug = %s",args.debug)
+        if use_proxy: 
+            logging.debug("(proxy) proxy %s:%s",proxy_host,proxy_port)
+            smtpserver = ProxySMTP(host=args.host, port=args.port,
+                            p_address=proxy_host, p_port=proxy_port)
+        else:
+            smtpserver = smtplib.SMTP_SSL(args.host, int(args.port))
         logging.debug("debug = %s",args.debug)
         smtpserver.set_debuglevel(args.debug)
         smtpserver.ehlo()
@@ -175,6 +200,142 @@ def send_email(args):
     except smtplib.SMTPAuthenticationError as e:
         logging.info("Unable to send message: %s",e)
 
+def create_send_grid_message(args):
+    """ Create the email message for send grid from the input args."""
+    
+    message = Mail(
+        from_email=args.sender,
+        to_emails=args.recipients,
+        subject=args.title,
+        html_content=args.html)
+
+    # attach files to an existing msg object
+    attach_files = []
+
+    if (args.files != None):
+        attach_files = args.files.split(',')
+
+
+    for f in attach_files or []:
+        logging.debug( "Adding %s to email.",f)
+        try:
+            with open(f, "rb") as fil:
+                encoded_string = base64.b64encode(fil.read()).decode()
+                fil.close()
+            
+            tmp = mimetypes.guess_type(f); mime_type = tmp[0] if tmp else ""
+
+            message.attachment = Attachment(
+                file_content=FileContent(encoded_string),
+                file_name=FileName(basename(f)),
+                file_type=FileType(mime_type),
+                disposition=Disposition("attachment")
+            )
+        except IOError as e:
+            logging.error("IO error on %s", e)
+
+    return message
+
+def send_email_sendgrid(args):
+    logging.info("sending send grid email to: %s",args.recipients)
+    logging.debug("debug = %s",args.debug)
+    logging.debug("args = %s",args)
+
+    message = create_send_grid_message(args)
+    # logging.debug('sendgrid message: %s', message)
+    try:
+        sg = SendGridAPIClient(os.environ.get('SENDGRID_API'))
+        response = sg.send(message)
+        logging.debug(response.status_code)
+        logging.debug(response.body)
+        logging.debug(response.headers)
+    except Exception as e:
+        logging.info("Unable to send message: %s",e)
+
+def send_email_gmail(args):
+    logging.info("sending gmail email to: %s",args.recipients)
+    logging.debug("debug = %s",args.debug)
+    logging.debug("args = %s",args)
+
+    CRED_LOCATION = '/home/genesys/.gmail/credentials.json'
+    TOKEN_LOCATION = '/home/genesys/.gmail/token.json'
+
+    # If modifying these scopes, delete the file token.json.
+    SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+
+    message = create_gmail_message(args)
+
+    if os.path.exists(TOKEN_LOCATION):
+        creds = Credentials.from_authorized_user_file(TOKEN_LOCATION, SCOPES)
+    # If there are no (valid) credentials available, try to refresh
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            # Save the credentials for the next run
+            with open(TOKEN_LOCATION, 'w') as token:
+                token.write(creds.to_json())
+        else:
+            logging.error("Need to regenerate gmail token file.. see test_send_gmail.py")
+        
+
+    try:
+        # create gmail api client
+        service = build('gmail', 'v1', credentials=creds)
+    
+        send_message = (service.users().messages().send
+                        (userId="me", body=message).execute())
+        logging.info("gmail sent message id: %s", send_message["id"])
+        logging.debug("gmail sent message: %s", send_message)
+       
+        
+    except HttpError as error:
+        logging.error('An error occurred sending email via gmail: %s',error)
+        send_message = None
+    return send_message
+
+def create_gmail_message(args):
+    """ Create the email message for gmail from the input args."""
+
+    mime_message = EmailMessage()
+
+    # headers
+    mime_message['To'] = args.recipients
+    mime_message['From'] = args.sender
+    mime_message['Subject'] = args.title
+    # text
+    if args.html:
+        mime_message.set_content(args.html, subtype='html')
+    elif args.plain:
+        mime_message.set_content(args.plain)
+
+    # attach files to an existing msg object
+    attach_files = []
+
+    if (args.files != None):
+        attach_files = args.files.split(',')
+
+    for f in attach_files or []:
+        logging.debug( "Adding %s to email.",f)
+        try:
+            type_subtype, _ = mimetypes.guess_type(f)
+            maintype, subtype = type_subtype.split('/')
+            filename=basename(f)
+            with open(f, "rb") as fp:
+                attachment_data = fp.read()
+            
+            tmp = mimetypes.guess_type(f); mime_type = tmp[0] if tmp else ""
+            mime_message.add_attachment(attachment_data, maintype, subtype, filename=filename)
+            
+        except IOError as e:
+            logging.error("IO error on %s", e)
+    
+    encoded_message = base64.urlsafe_b64encode(mime_message.as_bytes()).decode()
+
+    message = {
+        'raw': encoded_message
+    }
+    return message
+
 
 def setup_console_logging():
     ch = logging.StreamHandler()
@@ -186,6 +347,7 @@ def setup_console_logging():
     # add ch to logger
     logging.getLogger().addHandler(ch)
     logging.getLogger().setLevel(logging.DEBUG)
+
 
 def main():
     setup_console_logging()

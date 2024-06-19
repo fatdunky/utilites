@@ -12,7 +12,7 @@ def ssh_with_password(host, cmd, user, password, util_timeout=120, bg_run=False)
 		ret_val = ""
 		try:
 				s = pxssh.pxssh(timeout=util_timeout,options={"StrictHostKeyChecking": "no", "ServerAliveInterval": "30", "ConnectTimeout":"10"})
-				s.login(host, user, password)
+				s.login(host, user, password,  login_timeout=util_timeout)
 				logging.debug("ssh_cmd=%s",cmd)
 				s.sendline(cmd)                 # run a command
 				s.prompt()                      # match the prompt
@@ -88,9 +88,9 @@ def ssh_with_password_old(host, cmd, user, password, timeout=30, bg_run=False):
 				fin.close()
 		except:
 				print("Exception was thrown")
-				print(sys.exc_info()[0])
+				print((sys.exc_info()[0]))
 				print("debug information:")
-				print(str(child))
+				print((str(child)))
 
 		finally:
 				fout.close()
@@ -162,7 +162,27 @@ def scp_with_no_password(host, sfile, destination, user, password):
 
 		return stdout
 
-def ssh_no_password(host, cmd, timeout=30, bg_run=False):
+def ssh_no_password(host, cmd, user, util_timeout=300, bg_run=False):
+		ret_val = ""
+		try:
+				s = pxssh.pxssh(timeout=util_timeout,options={"StrictHostKeyChecking": "no", "ServerAliveInterval": "30", "ConnectTimeout":"10", "PreferredAuthentications":"hostbased,publickey"})
+				s.login(host, user, login_timeout=util_timeout)
+				logging.debug("ssh_cmd=%s",cmd)
+				s.sendline(cmd)                 # run a command
+				s.prompt()                      # match the prompt
+				ret_val = s.before              # print everything before the prompt.
+				s.logout()
+		except pxssh.ExceptionPxssh as e:
+				logging.info("pxssh failed on login.")
+				logging.info(e)
+		except Exception as e:
+				logging.info("pxssh caught exception.")
+				logging.info(e)
+
+		return ret_val
+
+
+def ssh_no_password_old(host, cmd, timeout=30, bg_run=False):
 		"""SSH'es to a host using the supplied credentials and executes a command.
 		Throws an exception if the command doesn't return 0.
 		bgrun: run command in the background"""

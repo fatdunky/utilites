@@ -17,7 +17,7 @@ def connect_to_db(db_name, connect_string):
 def disconnect_db(db_name):
     global connection
     logging.debug("disconnect_db, %s", db_name)
-    if (connection.has_key(db_name)):
+    if (db_name in connection):
         logging.debug("disconnecting, %s", db_name)
         connection[db_name].close()
 
@@ -25,7 +25,7 @@ def run_sql(db_name, sql):
     global connection
     logging.debug("connect=%s, sql=%s", db_name, sql)
     cnxn = None
-    if (connection.has_key(db_name)):
+    if (db_name in connection):
         cnxn = connection[db_name]
     else:
         return None
